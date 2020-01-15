@@ -1,8 +1,9 @@
-use crate::image_data::ImageData;
 use crate::application::*;
 use crate::geometry::*;
+use crate::image_data::ImageData;
 use crate::renderer::r#const::OPENGL_TO_WGPU_MATRIX;
 use crate::renderer::*;
+use crate::shading::TexShading;
 use crate::util::*;
 use crate::watch::*;
 use rendiation::*;
@@ -40,9 +41,8 @@ impl GPUItem<ImageData> for WGPUTexture {
 pub struct Rinecraft {
   camera: GPUPair<PerspectiveCamera, WGPUBuffer>,
   texture: GPUPair<ImageData, WGPUTexture>,
-  bind_group: WGPUBindGroup,
+  shading: TexShading,
   cube: StandardGeometry,
-  pipeline: WGPUPipeline,
   depth: WGPUAttachmentTexture,
 }
 
@@ -83,8 +83,8 @@ impl Application for Rinecraft {
 
     // Create the texture
     let size = 512u32;
-    let mut texture: GPUPair<ImageData, WGPUTexture> = GPUPair::new(create_texels(size as usize), renderer);
-    let texture_view = texture.get_update_gpu(renderer).make_default_view();
+    let mut texture: GPUPair<ImageData, WGPUTexture> =
+      GPUPair::new(create_texels(size as usize), renderer);
 
     // Create other resources
     let sampler = WGPUSampler::new(&renderer.device);
@@ -99,27 +99,23 @@ impl Application for Rinecraft {
       Vec3::unit_y(),
     );
 
-    // Create bind group
-    let bind_group = BindGroupBuilder::new()
-      .buffer(camera.get_update_gpu(renderer))
-      .texture(&texture_view)
-      .sampler(&sampler)
-      .build(&renderer.device, &pipeline.bind_group_layouts[0]);
-
     let depth = WGPUAttachmentTexture::new_as_depth(
       &renderer.device,
       wgpu::TextureFormat::Depth32Float,
       renderer.size,
     );
 
+    let text_gpu = texture.get_update_gpu(renderer);
+    let camera_gpu = camera.get_update_gpu(renderer);
+    let shading = TexShading::new(&renderer, text_gpu, camera_gpu, &sampler);
+
     // Done
     Rinecraft {
       cube,
       camera,
-      bind_group,
-      pipeline,
+      shading,
       depth,
-      texture
+      texture,
     }
   }
 
@@ -152,11 +148,7 @@ impl Application for Rinecraft {
         .output_with_clear(frame, (0.1, 0.2, 0.3, 1.0))
         .with_depth(&self.depth.get_view())
         .create(&mut renderer.encoder);
-      {
-        let rpass = &mut pass.gpu_pass;
-        rpass.set_pipeline(&self.pipeline.pipeline);
-        rpass.set_bind_group(0, &self.bind_group.gpu_bindgroup, &[]);
-      }
+      self.shading.use_shading(&mut pass);
       self.cube.render(&mut pass);
     }
 

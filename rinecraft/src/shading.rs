@@ -4,14 +4,16 @@ use rendiation::*;
 pub struct TexShading {
   pipeline: WGPUPipeline,
 
-  // bindgroup: Option<WGPUBindGroup>,
-
-  // texture: (usize, usize),
-  // matrix_uniform_buffer: (usize, usize),
+  bindgroup: WGPUBindGroup,
 }
 
 impl TexShading {
-  pub fn new(renderer: &WGPURenderer) -> Self {
+  pub fn new(
+    renderer: &WGPURenderer,
+    texture: &WGPUTexture,
+    matrix_buffer: &WGPUBuffer,
+    sampler: &WGPUSampler,
+  ) -> Self {
     let mut pipeline_builder = WGPUPipelineDescriptorBuilder::new();
     pipeline_builder
       .vertex_shader(include_str!("./shader.vert"))
@@ -41,8 +43,21 @@ impl TexShading {
     let pipeline =
       pipeline_builder.build::<StandardGeometry>(&renderer.device, &renderer.swap_chain_descriptor);
 
+    let texture_view = texture.make_default_view();
+    let bindgroup = BindGroupBuilder::new()
+      .buffer(matrix_buffer)
+      .texture(&texture_view)
+      .sampler(&sampler)
+      .build(&renderer.device, &pipeline.bind_group_layouts[0]);
+
     TexShading {
       pipeline,
+      bindgroup,
     }
+  }
+
+  pub fn use_shading(&self, pass: &mut WGPURenderPass){
+    pass.gpu_pass.set_pipeline(&self.pipeline.pipeline);
+    pass.gpu_pass.set_bind_group(0, &self.bindgroup.gpu_bindgroup, &[]);
   }
 }
