@@ -1,10 +1,6 @@
 use crate::event::MouseEvent;
 
-pub trait UINode{
-    
-}
-
-pub trait Element: UINode {
+pub trait Element {
   fn render();
 }
 

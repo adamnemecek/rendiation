@@ -1,12 +1,17 @@
 use crate::element::Div;
 
 pub trait Component<C>{
-    fn render(&self) -> Div<C>;
+    fn render(&self) -> UITreeNodeInstance<C>;
 }
 
-pub struct ComponentInstance<C: Component<C>>{
+pub enum UITreeNodeInstance<S>{
+    Instance(Box<ComponentInstance<S>>),
+    Element(Div<S>)
+}
+
+pub struct ComponentInstance<C>{
     state: C,
-    document: Div<C>
+    document: UITreeNodeInstance<C>
 }
 
 impl<C: Component<C>> ComponentInstance<C>{
@@ -39,34 +44,31 @@ impl TestCounter{
 }
 
 impl Component<TestCounter> for TestCounter{
-    fn render(&self) -> Div<Self>{
+    fn render(&self) -> UITreeNodeInstance<Self>{
         let mut div = Div::new();
         div.listener(
             |_, counter: &mut Self|{
                 counter.add()
             }
         );
-        div
+        UITreeNodeInstance::Element(div)
     }
 }
 
-//
-// more big
 
-// pub struct MyUI{
-//     counter: TestCounter,
-//     id: usize
-// }
+pub struct MyUI{
+    counter: TestCounter,
+}
 
 
-// impl Component<MyUI> for MyUI{
-//     fn render(&self) -> Div<Self>{
-//         let mut div = Div::new();
-//         div.listener(
-//             |_, counter: &mut Self|{
-//                 counter.add()
-//             }
-//         );
-//         div
-//     }
-// }
+impl Component<MyUI> for MyUI{
+    fn render(&self) -> UITreeNodeInstance<Self>{
+        let mut counter_com_instance = ComponentInstance::new(self.counter);
+        // div.listener(
+        //     |_, counter: &mut Self|{
+        //         counter.add()
+        //     }
+        // );
+        UITreeNodeInstance::Instance(Box::new(counter_com_instance))
+    }
+}
